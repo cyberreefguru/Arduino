@@ -49,6 +49,7 @@
 #define MAGENTA	RED | BLUE
 #define CYAN	BLUE | GREEN
 #define YELLOW	RED | GREEN
+
 #define ORANGE	0xFF3300
 #define PURPLE	0x990099
 
@@ -61,25 +62,32 @@
 #define ACTIVE_HIGH		1
 #define ACTIVE_LOW		0
 
+boolean fadeRings(uint8_t reps, uint32_t colorRing1, uint32_t colorRing2, uint32_t colorRing3, uint32_t colorRing4, uint32_t fadeDuration, uint32_t holdDuration);
+boolean fadeRings(uint8_t reps, uint32_t color, uint32_t fadeDuration, uint32_t holdDuration);
+boolean flashRingConcentric(uint8_t reps, uint32_t startColor, uint32_t color1, uint32_t color2, uint32_t holdDuration, uint32_t loopHoldDuration);
+
+
 void writeRing(uint8_t ring, uint32_t color, uint8_t show);
 
-void fade(uint8_t direction, uint32_t time, uint32_t color);
-void fade(uint8_t direction, uint32_t time, uint32_t color, uint8_t start, uint8_t end);
+boolean fade(uint8_t direction, uint32_t time, uint32_t color);
+boolean fade(uint8_t direction, uint32_t time, uint32_t color, uint8_t start, uint8_t end);
 
-void sparkle(uint32_t duration, uint32_t onTime, int32_t offTime, uint32_t onColor, uint32_t offColor);
-void sparkle(uint32_t duration, uint32_t onTime, int32_t offTime, uint32_t onColor, uint32_t offColor, uint8_t start, uint8_t end);
+boolean sparkle(uint32_t duration, uint32_t onTime, int32_t offTime, uint32_t onColor, uint32_t offColor);
+boolean sparkle(uint32_t duration, uint32_t onTime, int32_t offTime, uint32_t onColor, uint32_t offColor, uint8_t start, uint8_t end);
 
-void random(uint32_t delay, uint32_t onColor, uint32_t offColor);
-void random(uint32_t delay, uint32_t onColor, uint32_t offColor, uint8_t start, uint8_t end);
+boolean random(uint32_t delay, uint32_t onColor, uint32_t offColor);
+boolean random(uint32_t delay, uint32_t onColor, uint32_t offColor, uint8_t start, uint8_t end);
 
-void sequence(uint32_t wait, uint32_t onColor, uint32_t offColor, uint8_t clear);
-void sequence(uint32_t wait, uint32_t onColor, uint32_t offColor, uint8_t start, uint8_t end, uint8_t clear);
+boolean sequence(uint32_t wait, uint32_t onColor, uint32_t offColor, uint8_t clear);
+boolean sequence(uint32_t wait, uint32_t onColor, uint32_t offColor, uint8_t start, uint8_t end, uint8_t clear);
 
 void writeColor(uint32_t color, uint8_t show);
 void writeColor(uint32_t color, uint8_t start, uint8_t end, uint8_t show);
 
+boolean isCommandAvailable();
+void setCommandAvailable(boolean b);
 
-uint8_t commandWait(uint32_t wait);
+boolean commandWait(uint32_t wait);
 void worker();
 
 void ICACHE_RAM_ATTR isrActiveHighRisingEdge();
@@ -94,9 +102,16 @@ void ICACHE_RAM_ATTR isrInput1();
 void ICACHE_RAM_ATTR isrInput2();
 void ICACHE_RAM_ATTR isrInput3();
 
-//uint32_t gBuffer[NUM_PIXELS];
-//uint8_t gMode = 0;
+enum MODE { Start, Incoming, Landed };
+MODE gMode = Start;
+
+enum COLORS {White=WHITE, Black=BLACK, Red=RED, Green=GREEN, Blue=BLUE, Magenta=MAGENTA, Cyan=CYAN, Yellow=YELLOW, Orange=ORANGE, Purple=PURPLE };
+COLORS gHeartBeatColor = Blue;
+
+// Flag indicating a command has arrived
 uint8_t gCommand = 0;
+
+// Global value of LED brightness
 uint8_t gBrightness = 0;
 
 typedef void (*isrPtr)();
@@ -117,10 +132,11 @@ volatile bool			ledOn = false;
 volatile uint8_t 		hbCounter = 0;
 
 #define ISR_SIZE	3
-volatile DebounceInterruptConfig isrConfig[ISR_SIZE] = {
-		{PIN_BUTTON, ACTIVE_LOW, 0, false, false, 0, &isrInput1},
-		{PIN_INPUT_SW1, ACTIVE_HIGH, 0, false, false, 0, &isrInput2},
-		{PIN_INPUT_SW2, ACTIVE_LOW, 0, false, false, 0, &isrInput3}
+volatile DebounceInterruptConfig isrConfig[ISR_SIZE] =
+{
+	{PIN_BUTTON, ACTIVE_LOW, 0, false, false, 0, &isrInput1},
+	{PIN_INPUT_SW1, ACTIVE_HIGH, 0, false, false, 0, &isrInput2},
+	{PIN_INPUT_SW2, ACTIVE_LOW, 0, false, false, 0, &isrInput3}
 };
 
 //Do not add code below this line

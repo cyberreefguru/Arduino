@@ -6,9 +6,6 @@ Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUM_PIXELS, PIN_NEOPIXELS, NEO_RGB)
 
 ESP8266Timer ITimer;
 
-#define SWITCH		PIN_BUTTON
-
-
 //The setup function is called once at startup of the sketch
 void setup()
 {
@@ -65,7 +62,9 @@ void setup()
 	pixels.setBrightness(255);
 	writeColor(WHITE, false); // set LED color to white, but don't show
 
-	//gBrightness = 255;
+	gBrightness = 128;
+	gMode = Start;
+	gHeartBeatColor = Blue;
 
 	Serial.println("Setup Complete");
 
@@ -74,72 +73,115 @@ void setup()
 // The loop function is called in an endless loop
 void loop()
 {
-	pixels.setBrightness(128);
-
-	for(uint8_t i=0; i<5; i++)
+	switch( gMode )
 	{
-		sequence(25, RED, WHITE, 0, NUM_PIXELS-1, false);
-		sequence(25, WHITE, RED, NUM_PIXELS-1, 0, false);
+		case Start:
+			if( fadeRings(1, ORANGE, 10, 2000) ) break;
+			if( fadeRings(1, PURPLE, 10, 2000) ) break;
+			break;
+		case Incoming:
+			pixels.setBrightness(gBrightness);
+//			if( sequence(25, RED, WHITE, 0, NUM_PIXELS-1, false) ) break;
+//			if( sequence(25, WHITE, RED, NUM_PIXELS-1, 0, false) ) break;
+			if( sequence(10, RED, WHITE, 0, NUM_PIXELS-1, false) ) break;
+			if( sequence(10, WHITE, RED, 0, NUM_PIXELS-1, false) ) break;
+			break;
+		case Landed:
+			pixels.setBrightness(gBrightness);
+			if( flashRingConcentric( 1, WHITE, RED, WHITE, 50, 500) ) break;
+//			if( flashRingConcentric( 5, WHITE, ORANGE, PURPLE, 100, 500) ) break;
+			break;
+		default:
+			break;
+	}
+	if( isCommandAvailable() )
+	{
+		// Set the display mode. Simple state machine that advances each button press;
+		switch( gMode )
+		{
+			case Start:
+				gMode = Incoming;
+				gHeartBeatColor = Green;
+				break;
+			case Incoming:
+				gMode = Landed;
+				gHeartBeatColor = Red;
+				break;
+			case Landed:
+				gMode = Start;
+				gHeartBeatColor = Blue;
+				break;
+			default:
+				gMode = Start;
+				gHeartBeatColor = Blue;
+				break;
+		}
+		setCommandAvailable( false );
 	}
 
-	fade(UP, 10, ORANGE);
-	delay(2000);
-	fade(DOWN, 10, ORANGE);
+} // end loop
 
-	fade(UP, 10, PURPLE);
-	delay(2000);
-	fade(DOWN, 10, PURPLE);
+//boolean fadeRings(uint8_t reps, uint32_t colorRing1, uint32_t colorRing2, uint32_t colorRing3, uint32_t colorRing4, uint32_t fadeDuration, uint32_t holdDuration)
+//{
+//	return false;
+//}
 
 
-	pixels.setBrightness(128);
-	writeColor(WHITE, true);
-	for(uint8_t i=0; i<5; i++)
+boolean fadeRings(uint8_t reps, uint32_t color, uint32_t fadeDuration, uint32_t holdDuration)
+{
+	for(uint8_t i=0; i<reps; i++)
 	{
-		writeRing(RING_1, RED, true);
-		delay(100);
-		writeRing(RING_2, RED, true);
-		delay(100);
-		writeRing(RING_3, RED, true);
-		delay(100);
-		writeRing(RING_4, RED, true);
-		delay(100);
-		writeRing(RING_4, WHITE, true);
-		delay(100);
-		writeRing(RING_3, WHITE, true);
-		delay(100);
-		writeRing(RING_2, WHITE, true);
-		delay(100);
-		writeRing(RING_1, WHITE, true);
-		delay(500);
+		if( fade(UP, fadeDuration, color) ) return true;
+		if( commandWait( holdDuration) ) return true;
+		if( fade(DOWN, fadeDuration, color)) return true;
 	}
-
-
-	pixels.setBrightness(255);
-	writeColor(WHITE, true);
-	for(uint8_t i=0; i<5; i++)
-	{
-		writeRing(RING_1, ORANGE, true);
-		delay(100);
-		writeRing(RING_2, ORANGE, true);
-		delay(100);
-		writeRing(RING_3, ORANGE, true);
-		delay(100);
-		writeRing(RING_4, ORANGE, true);
-		delay(100);
-		writeRing(RING_4, PURPLE, true);
-		delay(100);
-		writeRing(RING_3, PURPLE, true);
-		delay(100);
-		writeRing(RING_2, PURPLE, true);
-		delay(100);
-		writeRing(RING_1, PURPLE, true);
-		delay(500);
-	}
-
-//	Serial.println("Loop End");
+	return false;
 
 }
 
+boolean flashRingConcentric(uint8_t reps, uint32_t startColor, uint32_t color1, uint32_t color2, uint32_t holdDuration, uint32_t loopHoldDuration)
+{
+	boolean cmd = isCommandAvailable();
+
+	if( !cmd )
+	{
+		pixels.setBrightness(gBrightness);
+		writeColor(startColor, true);
+		for(uint8_t i=0; i<reps; i++)
+		{
+			cmd = true;
+
+			writeRing(RING_1, color1, true);
+			if(commandWait(holdDuration)) break;
+
+			writeRing(RING_2, color1, true);
+			if(commandWait(holdDuration)) break;
+
+			writeRing(RING_3, color1, true);
+			if(commandWait(holdDuration)) break;
+
+			writeRing(RING_4, color1, true);
+			if(commandWait(holdDuration)) break;
+
+			writeRing(RING_4, color2, true);
+			if(commandWait(holdDuration)) break;
+
+			writeRing(RING_3, color2, true);
+			if(commandWait(holdDuration)) break;
+
+			writeRing(RING_2, color2, true);
+			if(commandWait(holdDuration)) break;
+
+			writeRing(RING_1, color2, true);
+			if(commandWait(loopHoldDuration)) break;
+
+			cmd = false;
+		}
+	} // end cmd
+
+	return cmd;
+
+} // end
 
 /**
  * Interrupt service routine that catches the falling edge of a pin interrupt for active low inputs.
@@ -354,16 +396,24 @@ void ICACHE_RAM_ATTR isrTimer()
 	switch(hbCounter)
 	{
 	case 1:
-		digitalWrite(PIN_LED_BLUE, HIGH);
+ 		digitalWrite(PIN_LED_RED, ( (gHeartBeatColor>>16) & 0x01) );	// on
+ 		digitalWrite(PIN_LED_GREEN, ( (gHeartBeatColor>>8) & 0x01) ); 	// on
+ 		digitalWrite(PIN_LED_BLUE, ( (gHeartBeatColor) & 0x01));  		// on
 		break;
 	case 3:
-		digitalWrite(PIN_LED_BLUE, LOW);
+ 		digitalWrite(PIN_LED_RED, LOW);   // off
+ 		digitalWrite(PIN_LED_GREEN, LOW); // off
+ 		digitalWrite(PIN_LED_BLUE, LOW);  // off
 		break;
 	case 5:
-		digitalWrite(PIN_LED_BLUE, HIGH);
+ 		digitalWrite(PIN_LED_RED, ( (gHeartBeatColor>>16) & 0x01) );	// on
+ 		digitalWrite(PIN_LED_GREEN, ( (gHeartBeatColor>>8) & 0x01) ); 	// on
+ 		digitalWrite(PIN_LED_BLUE, ( (gHeartBeatColor) & 0x01));  		// on
 		break;
 	case 7:
-		digitalWrite(PIN_LED_BLUE, LOW);
+ 		digitalWrite(PIN_LED_RED, LOW);   // off
+ 		digitalWrite(PIN_LED_GREEN, LOW); // off
+ 		digitalWrite(PIN_LED_BLUE, LOW);  // off
 		break;
 	case 14:
 		hbCounter=0;
@@ -391,20 +441,24 @@ void ICACHE_RAM_ATTR isrTimer()
 
 void ICACHE_RAM_ATTR isrInput1()
 {
-	Serial.println("\n** ISR INPUT 1 - BEGIN **");
-	if( ledOn )
-	{
-		Serial.printf("Turning LED off\n");
-		digitalWrite(PIN_LED_RED, LOW);
-		ledOn = false;
-	}
-	else
-	{
-		Serial.printf("Turning LED on\n");
-		digitalWrite(PIN_LED_RED, HIGH);
-		ledOn = true;
-	}
-	Serial.println("** ISR INPUT 1 - END **\n");
+//	Serial.println("\n** ISR INPUT 1 - BEGIN **");
+
+	gCommand = true;
+
+//	if( ledOn )
+//	{
+//		Serial.printf("Turning LED off\n");
+//		digitalWrite(PIN_LED_RED, LOW);
+//		ledOn = false;
+//	}
+//	else
+//	{
+//		Serial.printf("Turning LED on\n");
+//		digitalWrite(PIN_LED_RED, HIGH);
+//		ledOn = true;
+//	}
+
+//	Serial.println("** ISR INPUT 1 - END **\n");
 
 }
 
@@ -454,57 +508,67 @@ void writeRing(uint8_t ring, uint32_t color, uint8_t show)
 /**
  * Lights all LEDs in sequence. If clear = true, turns LED off after lighting.
  */
-void sequence(uint32_t wait, uint32_t onColor, uint32_t offColor, uint8_t clear)
+boolean sequence(uint32_t wait, uint32_t onColor, uint32_t offColor, uint8_t clear)
 {
-	sequence(wait, onColor, offColor, 0, NUM_PIXELS-1, clear);
+	return sequence(wait, onColor, offColor, 0, NUM_PIXELS-1, clear);
 }
 
 /**
  * Lights LEDs in sequence. Starting with start index, ending with end index.  If clear = true, turns LED off after lighting.
  */
-void sequence(uint32_t wait, uint32_t onColor, uint32_t offColor, uint8_t start, uint8_t end, uint8_t clear)
+boolean sequence(uint32_t wait, uint32_t onColor, uint32_t offColor, uint8_t start, uint8_t end, uint8_t clear)
 {
-	writeColor( offColor, true);
-	if( start < end)
-	{
-		for(uint8_t i=start; i<=end; i++)
-		{
-			pixels.setPixelColor(i, onColor);
-			pixels.show(); // show color
-			if( commandWait(wait))
-			{
-				break;
-			}
-			if( clear == true )
-			{
-				pixels.setPixelColor(i, offColor);
-				pixels.show(); // show color
-			}
-		}
-	}
-	else if(start > end)
-	{
-		uint8_t offset = 0;
-		uint8_t index = 0;
+	boolean cmd = isCommandAvailable();
 
-		for(uint8_t i=end; i<=start; i++)
+	if( !cmd )
+	{
+		writeColor( offColor, true);
+		if( start < end)
 		{
-			index = start-offset;
-			pixels.setPixelColor(index, onColor);
-			pixels.show(); // show color
-			if( commandWait(wait))
+			for(uint8_t i=start; i<=end; i++)
 			{
-				break;
-			}
-			if( clear == true )
-			{
-				pixels.setPixelColor(index, offColor);
+				pixels.setPixelColor(i, onColor);
 				pixels.show(); // show color
+				cmd = commandWait(wait);
+				if( cmd )
+				{
+					break;
+				}
+				if( clear == true )
+				{
+					pixels.setPixelColor(i, offColor);
+					pixels.show(); // show color
+				}
 			}
-			offset++;
 		}
-	}
-}
+		else if(start > end)
+		{
+			uint8_t offset = 0;
+			uint8_t index = 0;
+
+			for(uint8_t i=end; i<=start; i++)
+			{
+				index = start-offset;
+				pixels.setPixelColor(index, onColor);
+				pixels.show(); // show color
+				cmd = commandWait(wait);
+				if( cmd )
+				{
+					break;
+				}
+				if( clear == true )
+				{
+					pixels.setPixelColor(index, offColor);
+					pixels.show(); // show color
+				}
+				offset++;
+			}
+		}
+	} // end if cmd
+
+	return cmd;
+
+} // end sequence
 
 /**
  * Randomly turns on all LEDs
@@ -514,9 +578,9 @@ void sequence(uint32_t wait, uint32_t onColor, uint32_t offColor, uint8_t start,
  * @offColor
  *
  */
-void random(uint32_t wait, uint32_t onColor, uint32_t offColor)
+boolean random(uint32_t wait, uint32_t onColor, uint32_t offColor)
 {
-	random( wait, onColor, offColor, 0, NUM_PIXELS);
+	return random( wait, onColor, offColor, 0, NUM_PIXELS);
 }
 
 
@@ -529,67 +593,81 @@ void random(uint32_t wait, uint32_t onColor, uint32_t offColor)
  * @start
  * @end
  */
-void random(uint32_t wait, uint32_t onColor, uint32_t offColor, uint8_t start, uint8_t end)
+boolean random(uint32_t wait, uint32_t onColor, uint32_t offColor, uint8_t start, uint8_t end)
 {
 	uint16_t pixel = 0;
 	uint8_t count = 0;
 	uint8_t numPixels = end - start + 1;
+	boolean cmd = isCommandAvailable();
 
-	writeColor( offColor, true);
-
-	while( count < numPixels )
+	if( !cmd )
 	{
-		pixel = (uint8_t)random(0, numPixels-1);
-		if(pixels.getPixelColor(pixel) == offColor )
+		writeColor( offColor, true);
+
+		while( count < numPixels )
 		{
-			pixels.setPixelColor(pixel, onColor); // set color
-			pixels.show(); // show color
-			count++; // increase count
-			if(commandWait(wait))
+			pixel = (uint8_t)random(0, numPixels-1);
+			if(pixels.getPixelColor(pixel) == offColor )
 			{
-				break;
+				pixels.setPixelColor(pixel, onColor); // set color
+				pixels.show(); // show color
+				count++; // increase count
+				cmd = commandWait(wait);
+				if(cmd)
+				{
+					break;
+				}
 			}
+
 		}
+	} // end cmd
 
-	}
+	return cmd;
 }
 
 /**
  *
  */
-void sparkle(uint32_t duration, uint32_t onTime, int32_t offTime, uint32_t onColor, uint32_t offColor)
+boolean sparkle(uint32_t duration, uint32_t onTime, int32_t offTime, uint32_t onColor, uint32_t offColor)
 {
-	sparkle(duration, onTime, offTime, onColor, offColor, 0, NUM_PIXELS);
+	return sparkle(duration, onTime, offTime, onColor, offColor, 0, NUM_PIXELS);
 }
 
 /**
  *
  */
-void sparkle(uint32_t duration, uint32_t onTime, int32_t offTime, uint32_t onColor, uint32_t offColor, uint8_t start, uint8_t end)
+boolean sparkle(uint32_t duration, uint32_t onTime, int32_t offTime, uint32_t onColor, uint32_t offColor, uint8_t start, uint8_t end)
 {
 	uint16_t pixel = 0;
 	uint32_t now = millis() + duration;
 	uint8_t numPixels = end - start + 1;
+	boolean cmd = isCommandAvailable();
 
-	writeColor( offColor, true);
-
-	while( millis() < now )
+	if( !cmd )
 	{
-		pixel = (uint8_t)random(0, numPixels-1);
-		pixels.setPixelColor(pixel, onColor); // set color
-		pixels.show(); // show color
-		if( commandWait(onTime) )
+		writeColor( offColor, true);
+
+		while( millis() < now )
 		{
-			break;
-		}
-		pixels.setPixelColor(pixel, offColor); // set color
-		pixels.show();
-		if( commandWait(offTime))
-		{
-			break;
+			pixel = (uint8_t)random(0, numPixels-1);
+			pixels.setPixelColor(pixel, onColor); // set color
+			pixels.show(); // show color
+
+			cmd = commandWait(onTime);
+			if( cmd )
+			{
+				break;
+			}
+			pixels.setPixelColor(pixel, offColor); // set color
+			pixels.show();
+			cmd = commandWait(offTime);
+			if( cmd )
+			{
+				break;
+			}
 		}
 	}
-
+	return cmd;
 }
 
 /**
@@ -599,57 +677,71 @@ void sparkle(uint32_t duration, uint32_t onTime, int32_t offTime, uint32_t onCol
  * @time - time between fade changes (ms)
  * @color to fade from/to
  */
-void fade(uint8_t direction, uint32_t time, uint32_t color)
+boolean fade(uint8_t direction, uint32_t time, uint32_t color)
 {
 	uint8_t i;
+	boolean cmd = isCommandAvailable();
 
-	for(i=0; i<255; i++)
+	if( !cmd )
 	{
-		writeColor( color, false );
-		if( direction == DOWN )
+		for(i=0; i<255; i++)
 		{
-			pixels.setBrightness(255-i);
+			writeColor( color, false );
+			if( direction == DOWN )
+			{
+				pixels.setBrightness(255-i);
+			}
+			else if( direction == UP)
+			{
+				pixels.setBrightness(i);
+			}
+			pixels.show();
+			cmd = commandWait(time);
+			if( cmd )
+			{
+				break;
+			}
 		}
-		else if( direction == UP)
-		{
-			pixels.setBrightness(i);
-		}
-		pixels.show();
-		if( commandWait(time) )
-		{
-			break;
-		}
-	}
+	} // end cmd
+
+	return cmd;
 }
 
-void fade(uint8_t direction, uint32_t time, uint32_t color, uint8_t start, uint8_t end)
+boolean fade(uint8_t direction, uint32_t time, uint32_t color, uint8_t start, uint8_t end)
 {
 	uint8_t i;
     uint8_t r = (uint8_t)(color >> 16);
     uint8_t g = (uint8_t)(color >>  8);
     uint8_t b = (uint8_t)color;
     uint8_t brightness;
+    boolean cmd = isCommandAvailable();
 
-	for(i=0; i<255; i++)
-	{
-		for(int pixelIndex = start; pixelIndex < end; pixelIndex++)
+    if( !cmd )
+    {
+		for(i=0; i<255; i++)
 		{
-			if( direction == DOWN )
+			for(int pixelIndex = start; pixelIndex < end; pixelIndex++)
 			{
-				brightness = 255-i;
+				if( direction == DOWN )
+				{
+					brightness = 255-i;
+				}
+				else if( direction == UP)
+				{
+					brightness=i;
+				}
+				pixels.setPixelColor(pixelIndex, (brightness*r/255) , (brightness*g/255), (brightness*b/255));
 			}
-			else if( direction == UP)
+			pixels.show();
+			cmd = commandWait(time);
+			if( cmd )
 			{
-				brightness=i;
+				break;
 			}
-			pixels.setPixelColor(pixelIndex, (brightness*r/255) , (brightness*g/255), (brightness*b/255));
 		}
-		pixels.show();
-		if( commandWait(time) )
-		{
-			break;
-		}
-	}
+    }
+
+    return cmd;
 }
 
 /**
@@ -689,17 +781,25 @@ void writeColor(uint32_t color, uint8_t start, uint8_t end, uint8_t show)
  */
 boolean isCommandAvailable()
 {
-	// gCommand would normally be set here, or in an ISR.
-	// This specific program doesn't need to check for incoming commands.
 	return gCommand;
 }
 
+/**
+ *
+ */
+void setCommandAvailable(boolean cmd)
+{
+	gCommand = cmd;
+}
 
 /**
  * Delay function with command check. Delays for the specified amount of time, but checks for incoming
- * commands while delaying.
+ * commands while delaying. If command is received, breaks the loop.
+ *
+ * @time - duration to wait
+ * @return - true - command received; false - no command
  */
-uint8_t commandWait(uint32_t time)
+boolean commandWait(uint32_t time)
 {
 	boolean cmd = isCommandAvailable();
 	if( time == 0 ) return cmd;
