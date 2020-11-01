@@ -80,16 +80,21 @@ void loop()
 			if( fadeRings(1, PURPLE, 10, 2000) ) break;
 			break;
 		case Incoming:
-			pixels.setBrightness(gBrightness);
+//			pixels.setBrightness(gBrightness);
 //			if( sequence(25, RED, WHITE, 0, NUM_PIXELS-1, false) ) break;
 //			if( sequence(25, WHITE, RED, NUM_PIXELS-1, 0, false) ) break;
-			if( sequence(10, RED, WHITE, 0, NUM_PIXELS-1, false) ) break;
-			if( sequence(10, WHITE, RED, 0, NUM_PIXELS-1, false) ) break;
-			break;
-		case Landed:
+//			if( sequence(10, RED, WHITE, 0, NUM_PIXELS-1, false) ) break;
+//			if( sequence(10, WHITE, RED, 0, NUM_PIXELS-1, false) ) break;
 			pixels.setBrightness(gBrightness);
 			if( flashRingConcentric( 1, WHITE, RED, WHITE, 50, 500) ) break;
+			break;
+		case Landed:
+			gBrightness=128;
+			pixels.setBrightness(gBrightness);
+			writeColor(WHITE, true);
+//			if( flashRingConcentric( 1, WHITE, RED, WHITE, 50, 500) ) break;
 //			if( flashRingConcentric( 5, WHITE, ORANGE, PURPLE, 100, 500) ) break;
+
 			break;
 		default:
 			break;
